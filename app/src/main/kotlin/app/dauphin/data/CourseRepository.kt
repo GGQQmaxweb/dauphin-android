@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import app.dauphin.models.CourseResponse
+import app.dauphin.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
@@ -31,61 +30,40 @@ class CourseRepository(private val context: Context) {
 
     private val client = OkHttpClient()
 
-    private val Q_KEY = stringPreferencesKey("q_param")
     private val COURSE_DATA_KEY = stringPreferencesKey("course_data")
-    private val STUDENT_ID_KEY = stringPreferencesKey("student_id")
+    private val COOKIES_KEY = stringPreferencesKey("asp_net_cookies")
 
-    val qParamFlow: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[Q_KEY]
+    val cookiesFlow: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[COOKIES_KEY]
     }
 
-    val studentIdFlow: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[STUDENT_ID_KEY]
-    }
-
-    suspend fun saveStudentId(studentId: String) {
+    suspend fun saveCookies(cookies: String) {
         context.dataStore.edit { preferences ->
-            preferences[STUDENT_ID_KEY] = studentId
+            preferences[COOKIES_KEY] = cookies
         }
     }
 
     suspend fun clearSession() {
         context.dataStore.edit { preferences ->
-            preferences.remove(STUDENT_ID_KEY)
-            preferences.remove(Q_KEY)
+            preferences.remove(COOKIES_KEY)
             preferences.remove(COURSE_DATA_KEY)
         }
     }
 
-    suspend fun saveQParam(q: String) {
-        context.dataStore.edit { preferences ->
-            preferences[Q_KEY] = q
-        }
-    }
+    suspend fun getCourseData(): CourseResponse? = withContext(Dispatchers.IO) {
+        val cookies = cookiesFlow.first() ?: return@withContext null
 
-    suspend fun getCourseData(q: String? = null): CourseResponse? = withContext(Dispatchers.IO) {
-        val finalQ = q ?: qParamFlow.first() ?: return@withContext null
-        
-        if (q != null) {
-            saveQParam(q)
-        }
-
-        // Use HttpUrl to ensure parameters like '+' are properly encoded
-        val urlBuilder = "https://ilifeapi.az.tku.edu.tw/api/ilifeStuClassApi".toHttpUrlOrNull()
-            ?.newBuilder()
-            ?.addQueryParameter("q", finalQ)
-            ?.build()
-
-        val url = urlBuilder?.toString() ?: return@withContext null
+        val url = "https://ilifeapp.az.tku.edu.tw/api/stu/course"
 
         Log.d("CourseRepository", "Fetching from URL: $url")
 
         return@withContext try {
-            val remoteData = fetchFromRemote(url)
+            val remoteData = fetchFromRemote(url, cookies)
             if (remoteData != null) {
-                Log.d("CourseRepository", "Successfully fetched ${remoteData.stuelelist.size} classes")
-                saveToLocal(remoteData)
-                remoteData
+                val mappedData = CourseResponse(stuelelist = groupRawToItems(remoteData))
+                Log.d("CourseRepository", "Successfully fetched ${mappedData.stuelelist.size} grouped classes")
+                saveToLocal(mappedData)
+                mappedData
             } else {
                 Log.w("CourseRepository", "Remote fetch returned null, falling back to local")
                 fetchFromLocal()
@@ -96,8 +74,11 @@ class CourseRepository(private val context: Context) {
         }
     }
 
-    private fun fetchFromRemote(url: String): CourseResponse? {
-        val request = Request.Builder().url(url).build()
+    private fun fetchFromRemote(url: String, cookies: String): List<RawCourseItem>? {
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Cookie", cookies)
+            .build()
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
@@ -106,12 +87,45 @@ class CourseRepository(private val context: Context) {
                 }
                 val body = response.body?.string() ?: return null
                 Log.d("CourseRepository", "Response body: $body")
-                json.decodeFromString<CourseResponse>(body)
+                json.decodeFromString<List<RawCourseItem>>(body)
             }
         } catch (e: IOException) {
             Log.e("CourseRepository", "Network error", e)
             null
         }
+    }
+
+    private fun groupRawToItems(rawItems: List<RawCourseItem>): List<CourseItem> {
+        // Filter out empty courses and group by name and week
+        return rawItems.filter { it.ch_cos_name.isNotBlank() }
+            .groupBy { it.ch_cos_name + it.weekno }
+            .map { (_, sessions) ->
+                val first = sessions.first()
+                val sortedSno = sessions.map { it.sessno }.sorted()
+                
+                CourseItem(
+                    ch_cos_name = first.ch_cos_name,
+                    en_cos_name = first.en_cos_name,
+                    time_plase = "${first.week}${sortedSno.joinToString(",")}",
+                    seat_no = first.seatno,
+                    teach_name = first.teach_name,
+                    teach_name_en = first.teach_name_en,
+                    note = first.note,
+                    week = first.weekno,
+                    sess1 = sortedSno.getOrNull(0) ?: "",
+                    sess2 = sortedSno.getOrNull(1) ?: "",
+                    sess3 = sortedSno.getOrNull(2) ?: "",
+                    cos_no = "", // Not available in new API
+                    cos_ele_seq = "", // Not available in new API
+                    remark = "",
+                    room = first.room,
+                    timePlase = TimePlaseInfo(
+                        week = first.weekno,
+                        sesses = sortedSno,
+                        room = first.room
+                    )
+                )
+            }
     }
 
     private suspend fun saveToLocal(data: CourseResponse) {

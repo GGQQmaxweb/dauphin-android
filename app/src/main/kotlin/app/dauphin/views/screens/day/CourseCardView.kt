@@ -1,6 +1,7 @@
 package app.dauphin.views.screens.day
 
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
@@ -50,13 +51,15 @@ fun CourseCardView(
 
     val timeColor = getTimeColor(isOngoing, startTime, weekday, currentTime)
 
-    Card(
+    OutlinedCard(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .padding(8.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Top Row: Time & Ongoing

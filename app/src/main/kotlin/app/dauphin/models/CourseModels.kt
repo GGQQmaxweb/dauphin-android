@@ -33,3 +33,18 @@ data class TimePlaseInfo(
     val sesses: List<String>,
     val room: String
 )
+
+@Serializable
+data class RawCourseItem(
+    val weekno: String,
+    val sessno: String,
+    val week: String,
+    val sesstime: String,
+    val seatno: String,
+    val ch_cos_name: String,
+    val en_cos_name: String,
+    val teach_name: String,
+    val teach_name_en: String,
+    val note: String,
+    val room: String
+)

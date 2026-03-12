@@ -2,22 +2,24 @@ package app.dauphin.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.layout.*
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import app.dauphin.MainActivity
 import app.dauphin.data.CourseRepository
 import app.dauphin.models.CourseItem
@@ -37,76 +39,108 @@ class CourseCardWidget : GlanceAppWidget() {
         }
     }
 
+
+
     @Composable
     private fun WidgetContent(course: CourseItem?) {
-        Column(
+        Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(8.dp)
                 .background(GlanceTheme.colors.surface)
-                .clickable(actionStartActivity<MainActivity>()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (course == null) {
-                Text(
-                    text = "No upcoming classes",
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            } else {
-                val now = Calendar.getInstance().time
-                val (startTime, endTime) = getSessionTimes(listOf(course.sess1, course.sess2, course.sess3))
-                val isOngoing = now.after(startTime) && now.before(endTime)
-                val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
-
-                Column(modifier = GlanceModifier.fillMaxWidth().padding(8.dp)) {
-                    Row(
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+                    .clickable(actionStartActivity<MainActivity>()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (course == null) {
+                    Column(
                         modifier = GlanceModifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = if (isOngoing) "Ongoing" else "Next Class",
+                            text = "No upcoming classes",
                             style = TextStyle(
-                                color = if (isOngoing) GlanceTheme.colors.secondary else GlanceTheme.colors.primary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                color = GlanceTheme.colors.onSurface,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        Spacer(modifier = GlanceModifier.height(8.dp))
+                        Text(
+                            text = "Refresh",
+                            modifier = GlanceModifier.clickable(actionRunCallback<RefreshCallback>()),
+                            style = TextStyle(
+                                color = GlanceTheme.colors.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         )
                     }
+                } else {
+                    val now = Calendar.getInstance().time
+                    val (startTime, endTime) = getSessionTimes(listOf(course.sess1, course.sess2, course.sess3))
+                    val isOngoing = now.after(startTime) && now.before(endTime)
+                    val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
 
-                    Spacer(modifier = GlanceModifier.height(4.dp))
-
-                    Text(
-                        text = course.ch_cos_name,
-                        style = TextStyle(
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.onSurface
-                        ),
-                        maxLines = 2
-                    )
-
-                    Spacer(modifier = GlanceModifier.height(8.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = course.room,
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 14.sp
+                    Column(modifier = GlanceModifier.fillMaxWidth().padding(8.dp)) {
+                        Row(
+                            modifier = GlanceModifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isOngoing) "Ongoing" else "Next Class",
+                                style = TextStyle(
+                                    color = if (isOngoing) GlanceTheme.colors.secondary else GlanceTheme.colors.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
                             )
-                        )
-                        Spacer(modifier = GlanceModifier.width(12.dp))
-                        Text(
-                            text = "${timeFormat.format(startTime)} - ${timeFormat.format(endTime)}",
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 14.sp
+                            Spacer(modifier = GlanceModifier.defaultWeight())
+                            Text(
+                                text = "Refresh",
+                                modifier = GlanceModifier.clickable(actionRunCallback<RefreshCallback>()),
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             )
+                        }
+
+                        Spacer(modifier = GlanceModifier.height(4.dp))
+
+                        Text(
+                            text = course.ch_cos_name,
+                            style = TextStyle(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GlanceTheme.colors.onSurface
+                            ),
+                            maxLines = 2
                         )
+
+                        Spacer(modifier = GlanceModifier.height(8.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = course.room,
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurfaceVariant,
+                                    fontSize = 14.sp
+                                )
+                            )
+                            Spacer(modifier = GlanceModifier.width(12.dp))
+                            Text(
+                                text = "${timeFormat.format(startTime)} - ${timeFormat.format(endTime)}",
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurfaceVariant,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -188,4 +222,15 @@ class CourseCardWidget : GlanceAppWidget() {
         return createDate(first, false) to createDate(last, true)
     }
 
+}
+
+class RefreshCallback : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        CourseCardWidget().updateAll(context)
+        WidgetUpdateWorker.scheduleNextUpdate(context)
+    }
 }
