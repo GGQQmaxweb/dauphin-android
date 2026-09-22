@@ -7,7 +7,7 @@
 
 Dauphin is an Android app for Tamkang University students, providing easy access to course schedules, library services, campus events, and student ID barcode generation.
 
-<img width="1080" height="2001" alt="IMG_20260627_230512" src="https://github.com/user-attachments/assets/5d1878ad-2a60-4b40-ae4f-5759e86a6481" />
+<img width="540" height="1000" alt="IMG_20260627_230512" src="https://github.com/user-attachments/assets/5d1878ad-2a60-4b40-ae4f-5759e86a6481" />
 
 ## Acknowledgments
 
